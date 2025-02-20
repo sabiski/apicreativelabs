@@ -1,0 +1,79 @@
+Les attributs que vous avez mentionnés pour votre classe Paie semblent bien couvrir les informations essentielles liées à la paie d'un employé. Voici les attributs :
+
+mois : Le mois pour lequel la paie est effectuée.
+annee_de_paie : L'année de la paie.
+salairenet : Le salaire net de l'employé après déductions.
+prime : Les primes éventuellement accordées à l'employé (comme une prime de performance, de fin d'année, etc.).
+retenue : Les montants retenus sur le salaire (par exemple, pour des cotisations sociales ou des impôts).
+employeid : L'ID de l'employé auquel la paie correspond.
+Suggestions d'ajouts (facultatifs) :
+total : Le montant total de la paie (salairenet + prime - retenue). Cela pourrait être utile si vous voulez simplifier les calculs à partir de la base de données.
+date_paie : La date à laquelle la paie a été effectuée. Cela peut être différent du mois et de l'année de la paie.
+status : Le statut de la paie (par exemple, "payée", "en attente", "rejetée") pour mieux suivre l'état des paiements.
+type_paie : Le type de la paie (mensuelle, hebdomadaire, etc.), si applicable.
+SQL pour créer la table paie
+Si vous n'avez pas encore créé la table, voici un exemple de commande SQL pour cela :
+
+sql
+Copier le code
+CREATE TABLE paie (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    mois INT NOT NULL,
+    annee_de_paie INT NOT NULL,
+    salairenet DECIMAL(10, 2) NOT NULL,
+    prime DECIMAL(10, 2),
+    retenue DECIMAL(10, 2),
+    total DECIMAL(10, 2) AS (salairenet + prime - retenue) STORED,
+    employeid INT NOT NULL,
+    date_paie DATE NOT NULL,
+    status VARCHAR(50) DEFAULT 'en attente',
+    type_paie VARCHAR(50),
+    FOREIGN KEY (employeid) REFERENCES employe(id)
+);
+Points à considérer :
+Clé étrangère (employeid) : Assurez-vous que cette clé fait référence à la table employe.
+Calcul du total : La colonne total est calculée automatiquement dans cet exemple (en fonction du salaire net, de la prime et des retenues), mais vous pouvez la calculer manuellement lors de l'insertion de données si vous le préférez.
+Type de paie : Si vous gérez plusieurs types de paie, vous pouvez ajouter un champ pour préciser si la paie est mensuelle, hebdomadaire, etc.
+Si vous avez d'autres besoins pour cette table ou si vous avez des précisions sur le calcul de la paie, n'hésitez pas à me le faire savoir.
+
+
+
+INSERT INTO employe (
+    nom, 
+    prenom, 
+    email, 
+    dateembauche, 
+    poste, 
+    salairebase, 
+    telephone, 
+    departement, 
+    nomcontacturgence, 
+    telephonecontacturgence, 
+    relationcontacturgence, 
+    adresse, 
+    type_contrat, 
+    role, 
+    password,
+    matricule
+) VALUES (
+    'Admin', 
+    'System', 
+    'admin@gmail.com', 
+    '2024-01-01', 
+    'Administrateur', 
+    50000.00, 
+    '0123456789', 
+    'Administration', 
+    'Contact Urgence', 
+    '0987654321', 
+    'Famille', 
+    '123 rue Admin', 
+    'CDI', 
+    'ADMIN', 
+    '$2b$10$YourHashedPasswordHereICI', -- Utilisez bcrypt pour hasher le mot de passe
+    'ADM002'
+);
+
+ ALTER TABLE evaluations
+ADD COLUMN type_evaluation ENUM('recrutement', 'performance_annuelle', 'performance_semestrielle') 
+AFTER date_evaluation;
