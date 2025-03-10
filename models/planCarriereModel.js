@@ -42,30 +42,33 @@ const planCarriereModel = {
                 e.id as employe_id,
                 e.nom,
                 e.prenom,
-                e.poste,
-                e.departement,
-                hp.ancien_poste,
-                hp.nouveau_poste,
-                hp.date_changement as date_dernier_changement,
+                e.poste as poste_actuel,
+                e.departement as departement_actuel,
+                hp.poste as poste_cible,
+                hp.departement as departement_cible,
+                hp.date_debut,
+                hp.date_fin,
                 ev.type_evaluation,
                 ev.note_technique,
                 ev.note_soft_skills,
                 ev.objectifs_atteints,
-                ev.commentaires as commentaires_evaluation,
+                ev.commentaires as objectifs,
+                ev.evaluateur_id,
                 f.titre as formation_suivie,
-                f.date_debut as formation_date_debut,
-                fp.statut as statut_formation
+                fp.date_participation as formation_date_debut,
+                fp.status as statut_formation
             FROM employe e
             LEFT JOIN historique_poste hp ON e.id = hp.employe_id
             LEFT JOIN evaluations ev ON e.id = ev.employe_id
             LEFT JOIN formation_participation fp ON e.id = fp.employe_id
             LEFT JOIN formation f ON fp.formation_id = f.id
             WHERE e.id = ?
-            ORDER BY hp.date_changement DESC, ev.date_evaluation DESC, f.date_debut DESC
+            ORDER BY hp.date_debut DESC, ev.date_evaluation DESC, fp.date_participation DESC
             LIMIT 1`,
             [employeId]
         );
-        return plan[0];
+        
+        return plan;
     },
 
     // Créer un nouveau plan de carrière

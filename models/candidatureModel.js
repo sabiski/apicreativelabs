@@ -1,28 +1,79 @@
 const db = require('../config/database');
 
 const Candidature = {
-    getAllCandidatures: function(callback) {
-        db.query('SELECT * FROM candidature', callback);
+    getAllCandidatures: async () => {
+        try {
+            const [rows] = await db.query(`
+                SELECT c.*, o.titre as offre_titre 
+                FROM candidature c 
+                LEFT JOIN offre_emploi o ON c.offre_id = o.id 
+                ORDER BY c.date_candidature DESC
+            `);
+            return rows;
+        } catch (error) {
+            console.error('Erreur SQL getAllCandidatures:', error);
+            throw error;
+        }
     },
 
-    getCandidatureById: function(id, callback) {
-        db.query('SELECT * FROM candidature WHERE id = ?', [id], callback);
+    getCandidatureById: async (id) => {
+        try {
+            const [rows] = await db.query(
+                'SELECT * FROM candidature WHERE id = ?',
+                [id]
+            );
+            return rows[0];
+        } catch (error) {
+            throw error;
+        }
     },
 
-    getCandidaturesByOffre: function(offreId, callback) {
-        db.query('SELECT * FROM candidature WHERE offre_id = ?', [offreId], callback);
+    getCandidaturesByOffre: async (offreId) => {
+        try {
+            const [rows] = await db.query(
+                'SELECT * FROM candidature WHERE offre_id = ?',
+                [offreId]
+            );
+            return rows;
+        } catch (error) {
+            throw error;
+        }
     },
 
-    createCandidature: function(candidatureData, callback) {
-        db.query('INSERT INTO candidature SET ?', candidatureData, callback);
+    createCandidature: async (candidatureData) => {
+        try {
+            const [result] = await db.query(
+                'INSERT INTO candidature SET ?',
+                [candidatureData]
+            );
+            return result.insertId;
+        } catch (error) {
+            throw error;
+        }
     },
 
-    updateCandidature: function(id, candidatureData, callback) {
-        db.query('UPDATE candidature SET ? WHERE id = ?', [candidatureData, id], callback);
+    updateCandidature: async (id, updateData) => {
+        try {
+            const [result] = await db.query(
+                'UPDATE candidature SET ? WHERE id = ?',
+                [updateData, id]
+            );
+            return result.affectedRows > 0;
+        } catch (error) {
+            throw error;
+        }
     },
 
-    deleteCandidature: function(id, callback) {
-        db.query('DELETE FROM candidature WHERE id = ?', [id], callback);
+    deleteCandidature: async (id) => {
+        try {
+            const [result] = await db.query(
+                'DELETE FROM candidature WHERE id = ?',
+                [id]
+            );
+            return result.affectedRows > 0;
+        } catch (error) {
+            throw error;
+        }
     },
 
     getCandidaturesByStatut: function(statut, callback) {

@@ -43,21 +43,71 @@ exports.getFormationById = async (req, res) => {
 // Créer une formation
 exports.createFormation = async (req, res) => {
     try {
-        const { titre, description, date_debut, date_fin, formateur } = req.body;
+        const { 
+            titre, 
+            description, 
+            date_debut, 
+            date_fin,
+            manager_id,
+            status = 'non commencée',
+            type,
+            categorie,
+            max_participants,
+            evaluation
+        } = req.body;
+
         const [result] = await db.query(
-            'INSERT INTO formation (titre, description, date_debut, date_fin, formateur) VALUES (?, ?, ?, ?, ?)',
-            [titre, description, date_debut, date_fin, formateur]
+            `INSERT INTO formation (
+                titre, 
+                description, 
+                date_debut, 
+                date_fin, 
+                manager_id,
+                status,
+                type,
+                categorie,
+                max_participants,
+                evaluation
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            [
+                titre, 
+                description, 
+                date_debut, 
+                date_fin,
+                manager_id || null,
+                status,
+                type || null,
+                categorie || null,
+                max_participants || null,
+                evaluation || null
+            ]
         );
+
         res.status(201).json({
             success: true,
             message: "Formation créée avec succès",
-            data: { id: result.insertId }
+            data: {
+                id: result.insertId,
+                titre,
+                description,
+                date_debut,
+                date_fin,
+                manager_id,
+                status,
+                type,
+                categorie,
+                max_participants,
+                evaluation,
+                created_at: new Date(),
+                updated_at: null
+            }
         });
     } catch (error) {
         console.error('Erreur createFormation:', error);
         res.status(500).json({
             success: false,
-            message: "Erreur lors de la création de la formation"
+            message: "Erreur lors de la création de la formation",
+            error: error.message
         });
     }
 };
@@ -65,17 +115,55 @@ exports.createFormation = async (req, res) => {
 // Mettre à jour une formation
 exports.updateFormation = async (req, res) => {
     try {
-        const { titre, description, date_debut, date_fin, formateur } = req.body;
+        const id = req.params.id;
+        const { 
+            titre, 
+            description, 
+            date_debut, 
+            date_fin,
+            manager_id,
+            status,
+            type,
+            categorie,
+            max_participants,
+            evaluation
+        } = req.body;
+
         const [result] = await db.query(
-            'UPDATE formation SET titre = ?, description = ?, date_debut = ?, date_fin = ?, formateur = ? WHERE id = ?',
-            [titre, description, date_debut, date_fin, formateur, req.params.id]
+            `UPDATE formation 
+            SET titre = ?, 
+                description = ?, 
+                date_debut = ?, 
+                date_fin = ?,
+                manager_id = ?,
+                status = ?,
+                type = ?,
+                categorie = ?,
+                max_participants = ?,
+                evaluation = ?
+            WHERE id = ?`,
+            [
+                titre, 
+                description, 
+                date_debut, 
+                date_fin,
+                manager_id || null,
+                status || 'non commencée',
+                type || null,
+                categorie || null,
+                max_participants || null,
+                evaluation || null,
+                id
+            ]
         );
+
         if (result.affectedRows === 0) {
             return res.status(404).json({
                 success: false,
                 message: "Formation non trouvée"
             });
         }
+
         res.json({
             success: true,
             message: "Formation mise à jour avec succès"
@@ -84,7 +172,8 @@ exports.updateFormation = async (req, res) => {
         console.error('Erreur updateFormation:', error);
         res.status(500).json({
             success: false,
-            message: "Erreur lors de la mise à jour de la formation"
+            message: "Erreur lors de la mise à jour de la formation",
+            error: error.message
         });
     }
 };

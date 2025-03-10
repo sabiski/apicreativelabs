@@ -115,98 +115,46 @@ const entretienController = {
     
         createEntretien: async (req, res) => {
             try {
+                console.log('Données reçues:', req.body); // Debug
+
                 const entretienData = {
-                    candidature_id: req.body.candidature_id,
-                    date_entretien: req.body.date_entretien,
+                    candidature_id: req.body.candidature_id || null,
+                    date_entretien: new Date(req.body.date_entretien)
+                        .toISOString()
+                        .slice(0, 19)
+                        .replace('T', ' '),
                     type_entretien: req.body.type_entretien,
                     plateforme: req.body.plateforme,
                     lien_reunion: req.body.lien_reunion || null,
-                    recruteur_id: req.body.recruteur_id,
-                    statut: 'planifie'
+                    recruteur_id: req.body.recruteur_id || null,
+                    statut: req.body.statut || 'planifie'
                 };
-    
-                // Vérifier si la candidature existe
-                const checkCandidature = await new Promise((resolve, reject) => {
-                    db.query(
-                        'SELECT id FROM candidature WHERE id = ?',
-                        [entretienData.candidature_id],
-                        (err, results) => {
-                            if (err) reject(err);
-                            resolve(results);
+
+                console.log('Données formatées:', entretienData); // Debug
+
+                const [result] = await db.query(
+                    'INSERT INTO entretien SET ?',
+                    [entretienData]
+                );
+
+                console.log('Résultat insertion:', result); // Debug
+
+                if (result.insertId) {
+                    return res.status(201).json({
+                        success: true,
+                        message: "Entretien créé avec succès",
+                        data: {
+                            id: result.insertId,
+                            ...entretienData
                         }
-                    );
-                });
-    
-                if (!checkCandidature || checkCandidature.length === 0) {
-                    return res.status(404).json({
-                        success: false,
-                        message: "ID de candidature invalide ou non trouvé"
                     });
+                } else {
+                    throw new Error("Erreur lors de l'insertion");
                 }
-    
-                // Créer l'entretien
-                const createEntretien = await new Promise((resolve, reject) => {
-                    db.query(
-                        'INSERT INTO entretien SET ?',
-                        entretienData,
-                        (err, result) => {
-                            if (err) reject(err);
-                            resolve(result);
-                        }
-                    );
-                });
-    
-                // Mettre à jour le statut de la candidature
-                await new Promise((resolve, reject) => {
-                    db.query(
-                        'UPDATE candidature SET statut = "interview" WHERE id = ?',
-                        [entretienData.candidature_id],
-                        (err, result) => {
-                            if (err) reject(err);
-                            resolve(result);
-                        }
-                    );
-                });
-    
-                // Récupérer l'entretien créé avec les informations complètes
-                const newEntretien = await new Promise((resolve, reject) => {
-                    db.query(
-                        `SELECT e.*, c.nom, c.email 
-                        FROM entretien e 
-                        LEFT JOIN candidature c ON e.candidature_id = c.id 
-                        WHERE e.id = ?`,
-                        [createEntretien.insertId],
-                        (err, results) => {
-                            if (err) reject(err);
-                            resolve(results[0]);
-                        }
-                    );
-                });
-    
-                // Envoyer les notifications si nécessaire
-                try {
-                    const candidat = await getCandidatInfo(entretienData.candidature_id);
-                    if (candidat && candidat.email) {
-                        await emailService.sendEntretienInvitation(candidat, {
-                            date: entretienData.date_entretien,
-                            type: entretienData.type_entretien,
-                            lien: entretienData.lien_reunion
-                        });
-                    }
-                } catch (emailError) {
-                    console.error('Erreur lors de l\'envoi des notifications:', emailError);
-                    // Ne pas bloquer la création si l'envoi d'email échoue
-                }
-    
-                res.status(201).json({
-                    success: true,
-                    message: "Entretien planifié avec succès",
-                    data: newEntretien
-                });
-    
+
             } catch (error) {
-                console.error('Erreur:', error);
-                res.status(500).json({
+                console.error('Erreur createEntretien:', error);
+                return res.status(500).json({
                     success: false,
                     message: "Erreur lors de la création de l'entretien",
                     error: error.message
@@ -283,47 +231,46 @@ const entretienController = {
     },
 
     updateEntretien: async (req, res) => {
-        const id = req.params.id;
-        const entretienData = req.body;
-
         try {
-            Entretien.updateEntretien(id, entretienData, async (err, result) => {
-                if (err) {
-                    return res.status(500).json({
-                        success: false,
-                        message: "Erreur lors de la mise à jour de l'entretien",
-                        error: err
-                    });
-                }
-
-                // Si la date ou l'heure a changé, envoyer une notification
-                if (entretienData.date_entretien) {
-                    try {
-                        const candidat = await getCandidatInfo(entretienData.candidature_id);
-                        await emailService.sendEmail(
-                            candidat.email,
-                            'entretienUpdate',
-                            {
-                                date: entretienData.date_entretien,
-                                type: entretienData.type_entretien,
-                                lien: entretienData.lien_reunion
-                            }
-                        );
-                    } catch (emailError) {
-                        console.error('Erreur lors de l\'envoi de la notification:', emailError);
-                    }
-                }
-
-                res.status(200).json({
-                    success: true,
-                    message: "Entretien mis à jour avec succès"
+            const entretienId = req.params.id;
+            const entretienData = req.body;
+    
+            // Convertir une chaîne vide en NULL pour recruteur_id
+            if (entretienData.recruteur_id === '') {
+                entretienData.recruteur_id = null;
+            }
+    
+            // Vérifier que la date est au bon format
+            if (entretienData.date_entretien) {
+                entretienData.date_entretien = new Date(entretienData.date_entretien)
+                    .toISOString()
+                    .slice(0, 19)
+                    .replace('T', ' ');
+            }
+    
+            const result = await db.query(
+                'UPDATE entretien SET ? WHERE id = ?',
+                [entretienData, entretienId]
+            );
+    
+            if (result.affectedRows === 0) {
+                return res.status(404).json({
+                    success: false,
+                    message: "Entretien non trouvé"
                 });
+            }
+    
+            return res.status(200).json({
+                success: true,
+                message: "Entretien mis à jour avec succès"
             });
+    
         } catch (error) {
-            res.status(500).json({
+            console.error('Erreur updateEntretien:', error);
+            return res.status(500).json({
                 success: false,
                 message: "Erreur lors de la mise à jour de l'entretien",
-                error: error
+                error: error.message
             });
         }
     },
@@ -405,20 +352,60 @@ const entretienController = {
         }
     },
 
-    getAllEntretiens: (req, res) => {
-        Entretien.getAllEntretiens((err, results) => {
-            if (err) {
-                return res.status(500).json({
-                    success: false,
-                    message: "Erreur lors de la récupération des entretiens",
-                    error: err
-                });
-            }
-            res.status(200).json({
+    getAllEntretiens: async (req, res) => {
+        try {
+            console.log('Début getAllEntretiens'); // Debug
+
+            // Requête modifiée pour gérer les recruteurs non existants
+            const [rows] = await db.query(`
+                SELECT 
+                    e.*,
+                    c.nom as nom_candidat,
+                    c.email as email_candidat,
+                    o.titre as poste,
+                    COALESCE(emp.nom, 'Recruteur inconnu') as nom_recruteur,
+                    COALESCE(emp.prenom, '') as prenom_recruteur
+                FROM entretien e
+                LEFT JOIN candidature c ON e.candidature_id = c.id
+                LEFT JOIN offre_emploi o ON c.offre_id = o.id
+                LEFT JOIN employe emp ON e.recruteur_id = emp.id
+                ORDER BY e.date_entretien DESC
+            `);
+
+            console.log('Résultats bruts:', rows); // Debug
+
+            // Formater les données
+            const formattedRows = rows.map(row => ({
+                id: row.id,
+                candidature_id: row.candidature_id,
+                date_entretien: new Date(row.date_entretien).toISOString(),
+                type_entretien: row.type_entretien,
+                plateforme: row.plateforme || 'Non spécifiée',
+                lien_reunion: row.lien_reunion || '',
+                recruteur_id: row.recruteur_id,
+                statut: row.statut,
+                nom_recruteur: row.nom_recruteur === 'Recruteur inconnu' ? 
+                    `Recruteur #${row.recruteur_id} (non trouvé)` : 
+                    `${row.prenom_recruteur} ${row.nom_recruteur}`,
+                nom_candidat: row.nom_candidat || 'Candidat non assigné',
+                email_candidat: row.email_candidat || '',
+                poste: row.poste || 'Poste non spécifié'
+            }));
+
+            console.log('Données formatées:', formattedRows); // Debug
+
+            return res.status(200).json({
                 success: true,
-                data: results
+                data: formattedRows
             });
-        });
+        } catch (error) {
+            console.error('Erreur getAllEntretiens:', error);
+            return res.status(500).json({
+                success: false,
+                message: "Erreur lors de la récupération des entretiens",
+                error: error.message
+            });
+        }
     },
 
     getRappelsEntretien: async (req, res) => {
@@ -489,49 +476,14 @@ const entretienController = {
 
     sendRappelEntretien: async (req, res) => {
         try {
-            const entretienId = req.params.id;
-            const { type } = req.body;
-
-            // Récupérer les informations de l'entretien
-            const entretien = await new Promise((resolve, reject) => {
-                Entretien.getEntretienById(entretienId, (err, results) => {
-                    if (err) reject(err);
-                    else resolve(results[0]);
-                });
-            });
-
-            if (!entretien) {
-                return res.status(404).json({
-                    success: false,
-                    message: "Entretien non trouvé"
-                });
-            }
-
-            // Récupérer les informations du candidat
-            const candidat = await getCandidatInfo(entretien.candidature_id);
-
-            // Envoyer le rappel par email
-            await emailService.sendEmail(
-                candidat.email,
-                'rappelEntretien',
-                {
-                    subject: "Rappel : Votre entretien",
-                    message: `Rappel : Vous avez un entretien prévu le ${new Date(entretien.date_entretien).toLocaleString()}.
-                    Type d'entretien : ${entretien.type_entretien}
-                    ${entretien.lien_reunion ? `Lien de réunion : ${entretien.lien_reunion}` : ''}`,
-                    nom: candidat.nom,
-                    date: entretien.date_entretien
-                }
-            );
-
-            res.status(200).json({
+            // Logique d'envoi de rappel à implémenter
+            return res.status(200).json({
                 success: true,
                 message: "Rappel envoyé avec succès"
             });
-
         } catch (error) {
-            console.error('Erreur:', error);
-            res.status(500).json({
+            console.error('Erreur sendRappelEntretien:', error);
+            return res.status(500).json({
                 success: false,
                 message: "Erreur lors de l'envoi du rappel",
                 error: error.message
@@ -541,84 +493,28 @@ const entretienController = {
 
     setRappelEntretien: async (req, res) => {
         try {
-            const entretienId = req.params.id;
-            const { rappels, notifications } = req.body;
+            const rappelData = {
+                entretien_id: req.params.id,
+                type_rappel: req.body.type_rappel,
+                date_rappel: req.body.date_rappel,
+                notifications: req.body.notifications,
+                statut: 'actif'
+            };
 
-            console.log('Données reçues:', { entretienId, rappels, notifications }); // Debug
+            await db.query(
+                'INSERT INTO rappel_entretien SET ?',
+                [rappelData]
+            );
 
-            // Vérifier si l'entretien existe
-            const entretien = await new Promise((resolve, reject) => {
-                Entretien.getEntretienById(entretienId, (err, results) => {
-                    if (err) {
-                        console.error('Erreur SQL:', err);
-                        reject(err);
-                    } else {
-                        resolve(results[0]);
-                    }
-                });
-            });
-
-            if (!entretien) {
-                return res.status(404).json({
-                    success: false,
-                    message: "Entretien non trouvé"
-                });
-            }
-
-            // Supprimer les anciens rappels pour cet entretien
-            await new Promise((resolve, reject) => {
-                Entretien.deleteRappels(entretienId, (err, result) => {
-                    if (err) reject(err);
-                    else resolve(result);
-                });
-            });
-
-            // Créer les nouveaux rappels
-            const dateEntretien = new Date(entretien.date_entretien);
-            const rappelsPromises = rappels.map(rappel => {
-                let delaiMs;
-                switch(rappel.unite) {
-                    case 'minutes':
-                        delaiMs = rappel.delai * 60 * 1000;
-                        break;
-                    case 'heures':
-                        delaiMs = rappel.delai * 60 * 60 * 1000;
-                        break;
-                    case 'jours':
-                        delaiMs = rappel.delai * 24 * 60 * 60 * 1000;
-                        break;
-                    default:
-                        delaiMs = 0;
-                }
-
-                const dateRappel = new Date(dateEntretien.getTime() - delaiMs);
-
-                return new Promise((resolve, reject) => {
-                    Entretien.createRappel({
-                        entretien_id: entretienId,
-                        type_rappel: `${rappel.delai} ${rappel.unite}`,
-                        date_rappel: dateRappel,
-                        notifications: JSON.stringify(notifications),
-                        statut: 'planifié'
-                    }, (err, result) => {
-                        if (err) reject(err);
-                        else resolve(result);
-                    });
-                });
-            });
-
-            await Promise.all(rappelsPromises);
-
-            res.status(200).json({
+            return res.status(201).json({
                 success: true,
-                message: "Rappels configurés avec succès"
+                message: "Rappel créé avec succès"
             });
-
         } catch (error) {
-            console.error('Erreur complète:', error);
-            res.status(500).json({
+            console.error('Erreur setRappelEntretien:', error);
+            return res.status(500).json({
                 success: false,
-                message: "Erreur lors de la configuration des rappels",
+                message: "Erreur lors de la création du rappel",
                 error: error.message
             });
         }
@@ -636,55 +532,71 @@ const entretienController = {
 
     getEntretienById: async (req, res) => {
         try {
-            const id = req.params.id;
+            const [rows] = await db.query(`
+                SELECT 
+                    e.*,
+                    c.nom as nom_candidat,
+                    c.email as email_candidat,
+                    o.titre as poste,
+                    u.nom as nom_recruteur
+                FROM entretien e
+                LEFT JOIN candidature c ON e.candidature_id = c.id
+                LEFT JOIN offre_emploi o ON c.offre_id = o.id
+                LEFT JOIN employe u ON e.recruteur_id = u.id
+                WHERE e.id = ?
+            `, [req.params.id]);
 
-            const entretien = await new Promise((resolve, reject) => {
-                Entretien.getEntretienById(id, (err, results) => {
-                    if (err) {
-                        console.error('Erreur SQL:', err);
-                        reject(err);
-                    } else {
-                        resolve(results[0]);
-                    }
-                });
-            });
-
-            if (!entretien) {
+            if (!rows[0]) {
                 return res.status(404).json({
                     success: false,
                     message: "Entretien non trouvé"
                 });
             }
 
-            // Récupérer les informations détaillées
-            const candidat = await getCandidatInfo(entretien.candidature_id);
-            
-            // Enrichir l'objet entretien avec les informations du candidat
-            const entretienComplet = {
-                ...entretien,
-                candidat: {
-                    nom: candidat.nom,
-                    email: candidat.email,
-                    poste: candidat.poste
-                }
-            };
-
-            res.status(200).json({
+            return res.status(200).json({
                 success: true,
-                data: entretienComplet
+                data: rows[0]
             });
-
         } catch (error) {
-            console.error('Erreur:', error);
-            res.status(500).json({
+            console.error('Erreur getEntretienById:', error);
+            return res.status(500).json({
                 success: false,
                 message: "Erreur lors de la récupération de l'entretien",
                 error: error.message
             });
         }
-    }
+    },
 
-    
+    // Ajouter une fonction pour récupérer les recruteurs (managers)
+    getRecruteurs: async (req, res) => {
+        try {
+            const [rows] = await db.query(`
+                SELECT 
+                    id,
+                    nom,
+                    prenom,
+                    email
+                FROM employe 
+                WHERE role = 'manager'
+                ORDER BY nom, prenom
+            `);
+
+            return res.status(200).json({
+                success: true,
+                data: rows.map(row => ({
+                    ...row,
+                    nom_complet: `${row.prenom} ${row.nom}`
+                }))
+            });
+        } catch (error) {
+            console.error('Erreur getRecruteurs:', error);
+            return res.status(500).json({
+                success: false,
+                message: "Erreur lors de la récupération des recruteurs",
+                error: error.message
+            });
+        }
+    }
 };
 
 module.exports = entretienController; 

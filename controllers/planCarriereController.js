@@ -178,6 +178,26 @@ const planCarriereController = {
                 error: error.message
             });
         }
+    },
+
+    // Obtenir les formations en cours
+    getFormationsEnCours: async (req, res) => {
+        try {
+            const employeId = req.params.employeId;
+            const formations = await planCarriereModel.getFormationsEnCours(employeId);
+            
+            res.json({
+                success: true,
+                data: formations
+            });
+        } catch (error) {
+            console.error('Erreur getFormationsEnCours:', error);
+            res.status(500).json({
+                success: false,
+                message: "Erreur lors de la récupération des formations en cours",
+                error: error.message
+            });
+        }
     }
 };
 

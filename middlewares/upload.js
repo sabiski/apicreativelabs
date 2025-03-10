@@ -2,66 +2,42 @@ const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
 
-// Créer les dossiers d'upload s'ils n'existent pas
-const createUploadDirs = () => {
-    const dirs = ['uploads', 'uploads/photos', 'uploads/documents', 'uploads/cv', 'uploads/lettres'];
-    dirs.forEach(dir => {
-        if (!fs.existsSync(dir)) {
-            fs.mkdirSync(dir, { recursive: true });
-        }
-    });
-};
-
-createUploadDirs();
+// Créer le dossier uploads s'il n'existe pas
+const uploadDir = path.join(__dirname, '..', 'uploads', 'candidatures');
+if (!fs.existsSync(uploadDir)) {
+    fs.mkdirSync(uploadDir, { recursive: true });
+}
 
 // Configuration du stockage
 const storage = multer.diskStorage({
     destination: function (req, file, cb) {
-        let uploadPath = 'uploads/';
-        
-        // Définir le sous-dossier selon le type de fichier
-        switch (file.fieldname) {
-            case 'photo':
-                uploadPath += 'photos/';
-                break;
-            case 'cv':
-                uploadPath += 'cv/';
-                break;
-            case 'lettre_motivation':
-                uploadPath += 'lettres/';
-                break;
-            case 'document':
-                uploadPath += 'documents/';
-                break;
-            default:
-                uploadPath += 'documents/';
-        }
-        
-        cb(null, uploadPath);
+        cb(null, uploadDir);
     },
     filename: function (req, file, cb) {
+        // Nom de fichier unique avec timestamp
         const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
         cb(null, file.fieldname + '-' + uniqueSuffix + path.extname(file.originalname));
     }
 });
 
-// Filtre des fichiers
+// Filtre pour les types de fichiers
 const fileFilter = (req, file, cb) => {
     const allowedTypes = [
-        'image/jpeg',
-        'image/png',
         'application/pdf',
         'application/msword',
-        'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+        'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        'image/jpeg',
+        'image/png'
     ];
-    
-    if (!allowedTypes.includes(file.mimetype)) {
-        return cb(new Error('Type de fichier non autorisé'), false);
+
+    if (allowedTypes.includes(file.mimetype)) {
+        cb(null, true);
+    } else {
+        cb(new Error('Type de fichier non supporté'), false);
     }
-    cb(null, true);
 };
 
-// Création de l'instance multer
+// Configuration de multer
 const upload = multer({
     storage: storage,
     fileFilter: fileFilter,

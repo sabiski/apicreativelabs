@@ -7,42 +7,37 @@ const evaluationController = {
     // Récupérer toutes les évaluations
     getAllEvaluations: async (req, res) => {
         try {
-            // Log pour le débogage
-            console.log('Session dans getAllEvaluations:', {
-                sessionID: req.sessionID,
-                isAuthenticated: req.session.isAuthenticated,
-                userId: req.session.userId,
-                userRole: req.session.userRole
-            });
-
-            // Vérification supplémentaire du rôle
-            if (!['admin', 'manager'].includes(req.session.userRole)) {
-                return res.status(403).json({
-                    success: false,
-                    message: "Accès non autorisé aux évaluations"
-                });
-            }
-
             const [evaluations] = await db.query(`
                 SELECT e.*, 
                        emp.nom as employe_nom, 
-                       emp.prenom as employe_prenom
-                FROM evaluation e
+                       emp.prenom as employe_prenom,
+                       eval.nom as evaluateur_nom,
+                       eval.prenom as evaluateur_prenom
+                FROM evaluations e
                 LEFT JOIN employe emp ON e.employe_id = emp.id
+                LEFT JOIN employe eval ON e.evaluateur_id = eval.id
                 ORDER BY e.date_evaluation DESC
             `);
 
             console.log('Évaluations trouvées:', evaluations.length);
 
+            // Formater les données pour inclure les noms complets
+            const formattedEvaluations = evaluations.map(eval => ({
+                ...eval,
+                employe_nom_complet: `${eval.employe_prenom || ''} ${eval.employe_nom || ''}`.trim() || 'Non assigné',
+                evaluateur_nom_complet: `${eval.evaluateur_prenom || ''} ${eval.evaluateur_nom || ''}`.trim() || 'Non assigné'
+            }));
+
             return res.status(200).json({
                 success: true,
-                data: evaluations
+                data: formattedEvaluations
             });
         } catch (error) {
             console.error('Erreur getAllEvaluations:', error);
             return res.status(500).json({
                 success: false,
-                message: "Erreur lors de la récupération des évaluations"
+                message: "Erreur lors de la récupération des évaluations",
+                error: error.message
             });
         }
     },
@@ -141,31 +136,43 @@ const evaluationController = {
     // Mettre à jour une évaluation
     updateEvaluation: async (req, res) => {
         try {
-            const id = req.params.id;
+            const id = parseInt(req.params.id);
+            console.log('Mise à jour évaluation ID:', id); // Debug
+            console.log('Données reçues:', req.body); // Debug
+
+            // Préparer les données de mise à jour
             const evaluationData = {
-                note_technique: req.body.note_technique,
-                note_soft_skills: req.body.note_soft_skills,
-                commentaires: req.body.commentaires
+                note_technique: parseFloat(req.body.note_technique) || 0,
+                note_soft_skills: parseFloat(req.body.note_soft_skills) || 0,
+                commentaires: req.body.commentaires,
+                date_modification: new Date().toISOString().slice(0, 19).replace('T', ' ')
             };
 
-            await new Promise((resolve, reject) => {
-                Evaluation.updateEvaluation(id, evaluationData, (err, result) => {
-                    if (err) {
-                        console.error('Erreur SQL:', err);
-                        reject(err);
-                    } else {
-                        resolve(result);
-                    }
+            console.log('Données formatées:', evaluationData); // Debug
+
+            const [result] = await db.query(
+                'UPDATE evaluations SET ? WHERE id = ?',
+                [evaluationData, id]
+            );
+
+            console.log('Résultat de la mise à jour:', result); // Debug
+
+            if (result.affectedRows === 0) {
+                return res.status(404).json({
+                    success: false,
+                    message: "Évaluation non trouvée"
                 });
+            }
+
+            return res.status(200).json({
+                success: true,
+                message: "Évaluation mise à jour avec succès",
+                data: { id, ...evaluationData }
             });
 
-            res.status(200).json({
-                success: true,
-                message: "Évaluation mise à jour avec succès"
-            });
         } catch (error) {
-            console.error('Erreur:', error);
-            res.status(500).json({
+            console.error('Erreur updateEvaluation:', error);
+            return res.status(500).json({
                 success: false,
                 message: "Erreur lors de la mise à jour de l'évaluation",
                 error: error.message
@@ -176,25 +183,30 @@ const evaluationController = {
     // Supprimer une évaluation
     deleteEvaluation: async (req, res) => {
         try {
-            const id = req.params.id;
-            await new Promise((resolve, reject) => {
-                Evaluation.deleteEvaluation(id, (err, result) => {
-                    if (err) {
-                        console.error('Erreur SQL:', err);
-                        reject(err);
-                    } else {
-                        resolve(result);
-                    }
-                });
-            });
+            console.log('Début deleteEvaluation, ID:', req.params.id); // Debug
 
-            res.status(200).json({
+            const [result] = await db.query(
+                'DELETE FROM evaluations WHERE id = ?',
+                [req.params.id]
+            );
+
+            console.log('Résultat de la suppression:', result); // Debug
+
+            if (result.affectedRows === 0) {
+                return res.status(404).json({
+                    success: false,
+                    message: "Évaluation non trouvée"
+                });
+            }
+
+            return res.status(200).json({
                 success: true,
                 message: "Évaluation supprimée avec succès"
             });
+
         } catch (error) {
-            console.error('Erreur:', error);
-            res.status(500).json({
+            console.error('Erreur deleteEvaluation:', error);
+            return res.status(500).json({
                 success: false,
                 message: "Erreur lors de la suppression de l'évaluation",
                 error: error.message
@@ -442,6 +454,24 @@ const evaluationController = {
             res.status(500).json({
                 success: false,
                 message: "Erreur lors de la création de l'évaluation",
+                error: error.message
+            });
+        }
+    },
+
+    // Ajouter cette nouvelle méthode
+    getAllEvaluateurs: async (req, res) => {
+        try {
+            const evaluateurs = await Evaluation.getAllEvaluateurs();
+            res.json({
+                success: true,
+                data: evaluateurs
+            });
+        } catch (error) {
+            console.error('Erreur getAllEvaluateurs:', error);
+            res.status(500).json({
+                success: false,
+                message: "Erreur lors de la récupération des évaluateurs",
                 error: error.message
             });
         }

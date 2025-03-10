@@ -2,13 +2,19 @@ const express = require('express');
 const router = express.Router();
 const formationParticipationController = require('../controllers/formationParticipationController');
 
-// Routes pour les participations aux formations
-router.get('/participations', formationParticipationController.getAllParticipations);
-router.get('/participations/:id', formationParticipationController.getParticipationById);
+// Route pour obtenir les participants d'une formation
 router.get('/formations/:formationId/participations', formationParticipationController.getParticipationsByFormation);
-router.get('/employes/:employeId/participations', formationParticipationController.getParticipationsByEmployee);
-router.post('/participations', formationParticipationController.createParticipation);
+
+// Route pour mettre à jour une participation
 router.put('/participations/:id', formationParticipationController.updateParticipation);
+
+// Ajout de la route de suppression
 router.delete('/participations/:id', formationParticipationController.deleteParticipation);
+
+// Ajout de la route pour obtenir une participation spécifique
+router.get('/participations/:id', formationParticipationController.getParticipationById);
+
+// Ajout de la route pour créer une participation
+router.post('/participations', formationParticipationController.createParticipation);
 
 module.exports = router; 

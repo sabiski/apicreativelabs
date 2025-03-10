@@ -10,8 +10,8 @@ router.put('/employe/:employeId', planCarriereController.updatePlanCarriere);
 router.delete('/employe/:employeId', planCarriereController.deletePlanCarriere);
 
 // Routes pour l'historique
-router.get('/employe/:employeId/evaluations', planCarriereController.getHistoriqueEvaluations);
-router.get('/employe/:employeId/formations', planCarriereController.getHistoriqueFormations);
-router.get('/employe/:employeId/postes', planCarriereController.getHistoriquePostes);
+router.get('/historique-postes/:employeId', planCarriereController.getHistoriquePostes);
+router.get('/historique-evaluations/:employeId', planCarriereController.getHistoriqueEvaluations);
+router.get('/historique-formations/:employeId', planCarriereController.getHistoriqueFormations);
 
 module.exports = router; 
